@@ -42,7 +42,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           provenance: false
-          tags: ghcr.io/humanitylabs-org/wizard-ai-accounts:0.1.0
+          tags: ghcr.io/humanitylabs-org/wizard-ai-accounts:0.1.1
       - name: Publish tested Hermes Agent Wizard build (amd64 and arm64)
         uses: docker/build-push-action@v6
         with:
@@ -50,12 +50,12 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           provenance: false
-          tags: ghcr.io/humanitylabs-org/hermes-agent:v2026.9.24-wizard1
+          tags: ghcr.io/humanitylabs-org/hermes-agent:v2026.9.24-wizard2
       - name: Published images pass the same checks
         run: |
-          docker pull ghcr.io/humanitylabs-org/wizard-ai-accounts:0.1.0
-          SKIP_BUILD=1 AI_ACCOUNTS_IMAGE=ghcr.io/humanitylabs-org/wizard-ai-accounts:0.1.0 sh images/wizard-ai-accounts/test-container.sh
-          docker pull ghcr.io/humanitylabs-org/hermes-agent:v2026.9.24-wizard1
-          docker run --rm --entrypoint sh ghcr.io/humanitylabs-org/hermes-agent:v2026.9.24-wizard1 -c \
-            'claude --version | grep -q "^2.1.263 " && test -f /opt/hermes/plugins/model-providers/claude-subscription-directsdk-experimental/plugin.yaml'
+          docker pull ghcr.io/humanitylabs-org/wizard-ai-accounts:0.1.1
+          SKIP_BUILD=1 AI_ACCOUNTS_IMAGE=ghcr.io/humanitylabs-org/wizard-ai-accounts:0.1.1 sh images/wizard-ai-accounts/test-container.sh
+          docker pull ghcr.io/humanitylabs-org/hermes-agent:v2026.9.24-wizard2
+          docker run --rm --entrypoint sh ghcr.io/humanitylabs-org/hermes-agent:v2026.9.24-wizard2 -c \
+            'claude --version | grep -q "^2.1.296 " && test -f /opt/hermes/plugins/model-providers/claude-subscription-directsdk-experimental/plugin.yaml'
 # Publishes only after store, container, provider, shared-volume and data-parity checks pass.

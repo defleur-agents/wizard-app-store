@@ -145,7 +145,7 @@ grep -c "Traceback" /tmp/out.txt || true
     out = run("docker", "run", "--rm", "--user", "1000:1000", "-e", "HOME=/tmp", "-e", "HERMES_HOME=/tmp/h",
               "-v", f"{vol}:/claude", "--entrypoint", "sh", HERMES, "-c", script, timeout=300).splitlines()
     info = json.loads(out[1])
-    assert out[0].startswith("2.1.263 "), out[0]
+    assert out[0].startswith("2.1.296 "), out[0]
     assert info["profile"] == "ClaudeOAuthDirectSDKProfile" and info["source"] == "bundled", info
     assert info["listed"] and info["listed"][0]["label"] == "Claude Subscription DirectSDK (Experimental)", info
     assert int(out[2]) > 0, "plugin's logged-out message missing"
