@@ -85,7 +85,11 @@ RUN uv python install 3.11 && \
     find /opt/hermes/.venv -name '*.pyc' -delete && \
     readlink -f /opt/hermes/.venv/bin/python | grep -q '^/opt/uv-python/' && \
     /opt/hermes/.venv/bin/hermes --version
-RUN cd web && npm run build && cd ../ui-tui && npm run build && \
+# The dashboard and TUI ship as prebuilt bundles (HERMES_WEB_DIST, HERMES_TUI_DIR, as upstream), so build-only
+# packages (typescript, vite, rolldown, three, babel, esbuild, eslint, vitest, prettier) are pruned afterwards.
+RUN cd web && npm run build && cd ../ui-tui && npm run build && cd .. && \
+    npm prune --omit=dev --no-audit && \
+    test -f hermes_cli/web_dist/index.html && test -f ui-tui/dist/entry.js && test -d node_modules/@hermes/ink && \
     rm -rf /opt/hermes/web/node_modules/.cache /root/.npm /root/.cache
 
 # ---------- runtime ----------
@@ -131,7 +135,8 @@ COPY --link --chmod=a+rX,go-w --from=build /opt/hermes /opt/hermes
 WORKDIR /opt/hermes
 # Shared libraries the headless shell needs (what `playwright install --with-deps` adds), runtime only.
 RUN apt-get -o Acquire::Retries=3 update && npx playwright install-deps chromium && \
-    rm -rf /var/lib/apt/lists/* /root/.npm
+    rm -rf /var/lib/apt/lists/* /root/.npm /usr/share/doc/* /usr/share/man/* /usr/share/info/* && \
+    find /usr/share/locale -mindepth 1 -maxdepth 1 ! -name 'en*' ! -name 'locale.alias' -exec rm -rf {} +
 RUN mkdir -p /tmp/.X11-unix /tmp/hermes-runtime && chmod 1777 /tmp/.X11-unix && chmod 0700 /tmp/hermes-runtime
 
 COPY --chmod=0755 --from=build /opt/hermes/docker/tini-shim.sh /usr/bin/tini
