@@ -46,10 +46,27 @@ jobs:
             ls /opt/hermes/.playwright/ && ldd $(ls -d /opt/hermes/.playwright/chromium_headless_shell-*/chrome-*/chrome-headless-shell | head -1) | grep -c "not found" | grep -q "^0$" &&
             test -f /opt/hermes/hermes_cli/web_dist/index.html && test -f /opt/hermes/ui-tui/dist/entry.js &&
             ! command -v gcc && ! command -v docker && echo SMOKE_OK'
-          cid=$(docker run -d -e API_SERVER_KEY=smoke-key -e API_SERVER_HOST=0.0.0.0 -e API_SERVER_PORT=8642 -p 8642:8642 hermes-slim:test gateway run)
-          for i in $(seq 1 60); do curl -fsS -H 'Authorization: Bearer smoke-key' http://127.0.0.1:8642/v1/models && break; sleep 3; done
-          curl -fsS -H 'Authorization: Bearer smoke-key' http://127.0.0.1:8642/v1/models
-          docker logs "$cid" 2>&1 | tail -20; docker rm -f "$cid"
+          # Boot both images the same way (API server needs a real-length key) and require the same answers.
+          KEY=$(openssl rand -hex 24)
+          docker pull -q nousresearch/hermes-agent:v2026.9.24
+          for img in nousresearch/hermes-agent:v2026.9.24 hermes-slim:test; do
+            cid=$(docker run -d -e API_SERVER_KEY=$KEY -e API_SERVER_HOST=0.0.0.0 -e API_SERVER_PORT=8642 -p 127.0.0.1::8642 "$img" gateway run)
+            port=$(docker port "$cid" 8642/tcp | head -1 | awk -F: '{print $NF}')
+            ok=""
+            for i in $(seq 1 80); do
+              if curl -fsS -m 5 -H "Authorization: Bearer $KEY" "http://127.0.0.1:$port/v1/models" > "/tmp/models-${img//[\/:]/_}.json"; then ok=1; break; fi
+              sleep 3
+            done
+            docker logs "$cid" 2>&1 | tail -15
+            docker rm -f "$cid" >/dev/null
+            [ -n "$ok" ] || { echo "API_BOOT_FAIL $img"; exit 1; }
+            echo "API_BOOT_OK $img after ${i} tries: $(cat /tmp/models-${img//[\/:]/_}.json | head -c 200)"
+          done
+      - name: Same Wizard checks as the published wizard2 image (provider discovery, plugin tests, shared /claude volume, /opt/data parity)
+        run: |
+          set -eux
+          sh images/wizard-ai-accounts/test-container.sh
+          TMPDIR="$RUNNER_TEMP" HERMES_IMAGE=hermes-slim:test python3 scripts/smoke-ai-accounts.py
       - uses: docker/login-action@v3
         if: github.repository_owner == 'humanitylabs-org'
         with:
