@@ -48,7 +48,9 @@ RUN python3 /fetch-claude-code.py "$TARGETARCH" /out/claude \
 FROM debian:13.4 AS build
 ARG HERMES_REF
 ARG HERMES_COMMIT
-ENV PYTHONDONTWRITEBYTECODE=1 PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright npm_config_install_links=false
+# The venv must use Debian's /usr/bin/python3, which the runtime stage also has (no uv-managed Python).
+ENV PYTHONDONTWRITEBYTECODE=1 PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright npm_config_install_links=false \
+    UV_PYTHON=/usr/bin/python3 UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy
 RUN apt-get -o Acquire::Retries=3 update && \
     apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
     ca-certificates curl git python3 python-is-python3 python3-venv python3-dev gcc g++ make libffi-dev && \
@@ -78,7 +80,9 @@ RUN uv sync --frozen --no-install-project --no-cache \
       --extra all --extra messaging --extra anthropic && \
     uv pip install --no-cache-dir --no-deps -e "." && \
     find /opt/hermes/.venv -name '__pycache__' -prune -exec rm -rf {} + && \
-    find /opt/hermes/.venv -name '*.pyc' -delete
+    find /opt/hermes/.venv -name '*.pyc' -delete && \
+    test "$(readlink -f /opt/hermes/.venv/bin/python)" = "$(readlink -f /usr/bin/python3)" && \
+    /opt/hermes/.venv/bin/hermes --version
 RUN cd web && npm run build && cd ../ui-tui && npm run build && \
     rm -rf /opt/hermes/web/node_modules/.cache /root/.npm /root/.cache
 
