@@ -48,9 +48,10 @@ RUN python3 /fetch-claude-code.py "$TARGETARCH" /out/claude \
 FROM debian:13.4 AS build
 ARG HERMES_REF
 ARG HERMES_COMMIT
-# The venv must use Debian's /usr/bin/python3, which the runtime stage also has (no uv-managed Python).
+# Hermes pins Python 3.11 (.python-version), as the official image does via uv's managed interpreter. Install it in
+# a fixed path so the runtime stage can copy the interpreter together with the venv that points at it.
 ENV PYTHONDONTWRITEBYTECODE=1 PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright npm_config_install_links=false \
-    UV_PYTHON_PREFERENCE=only-system UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy
+    UV_PYTHON_INSTALL_DIR=/opt/uv-python UV_LINK_MODE=copy
 RUN apt-get -o Acquire::Retries=3 update && \
     apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
     ca-certificates curl git python3 python-is-python3 python3-venv python3-dev gcc g++ make libffi-dev && \
@@ -76,13 +77,13 @@ WORKDIR /opt/hermes
 RUN npm install --prefer-offline --no-audit --fetch-retries=5 && \
     for i in 1 2 3; do npx playwright install chromium --only-shell && break || { [ "$i" = 3 ] && exit 1; sleep 10; }; done && \
     npm cache clean --force
-RUN uv venv --python /usr/bin/python3 .venv && \
+RUN uv python install 3.11 && \
     uv sync --frozen --no-install-project --no-cache \
       --extra all --extra messaging --extra anthropic && \
     uv pip install --python .venv/bin/python --no-cache-dir --no-deps -e "." && \
     find /opt/hermes/.venv -name '__pycache__' -prune -exec rm -rf {} + && \
     find /opt/hermes/.venv -name '*.pyc' -delete && \
-    test "$(readlink -f /opt/hermes/.venv/bin/python)" = "$(readlink -f /usr/bin/python3)" && \
+    readlink -f /opt/hermes/.venv/bin/python | grep -q '^/opt/uv-python/' && \
     /opt/hermes/.venv/bin/hermes --version
 RUN cd web && npm run build && cd ../ui-tui && npm run build && \
     rm -rf /opt/hermes/web/node_modules/.cache /root/.npm /root/.cache
@@ -125,6 +126,7 @@ COPY --from=node_source /usr/local/lib/node_modules/npm /usr/local/lib/node_modu
 RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
     ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
+COPY --link --chmod=a+rX,go-w --from=build /opt/uv-python /opt/uv-python
 COPY --link --chmod=a+rX,go-w --from=build /opt/hermes /opt/hermes
 WORKDIR /opt/hermes
 # Shared libraries the headless shell needs (what `playwright install --with-deps` adds), runtime only.
