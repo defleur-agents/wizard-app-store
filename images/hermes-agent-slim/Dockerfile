@@ -50,7 +50,7 @@ ARG HERMES_REF
 ARG HERMES_COMMIT
 # The venv must use Debian's /usr/bin/python3, which the runtime stage also has (no uv-managed Python).
 ENV PYTHONDONTWRITEBYTECODE=1 PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright npm_config_install_links=false \
-    UV_PYTHON=/usr/bin/python3 UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy
+    UV_PYTHON_PREFERENCE=only-system UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy
 RUN apt-get -o Acquire::Retries=3 update && \
     apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
     ca-certificates curl git python3 python-is-python3 python3-venv python3-dev gcc g++ make libffi-dev && \
@@ -76,9 +76,10 @@ WORKDIR /opt/hermes
 RUN npm install --prefer-offline --no-audit --fetch-retries=5 && \
     for i in 1 2 3; do npx playwright install chromium --only-shell && break || { [ "$i" = 3 ] && exit 1; sleep 10; }; done && \
     npm cache clean --force
-RUN uv sync --frozen --no-install-project --no-cache \
+RUN uv venv --python /usr/bin/python3 .venv && \
+    uv sync --frozen --no-install-project --no-cache \
       --extra all --extra messaging --extra anthropic && \
-    uv pip install --no-cache-dir --no-deps -e "." && \
+    uv pip install --python .venv/bin/python --no-cache-dir --no-deps -e "." && \
     find /opt/hermes/.venv -name '__pycache__' -prune -exec rm -rf {} + && \
     find /opt/hermes/.venv -name '*.pyc' -delete && \
     test "$(readlink -f /opt/hermes/.venv/bin/python)" = "$(readlink -f /usr/bin/python3)" && \
