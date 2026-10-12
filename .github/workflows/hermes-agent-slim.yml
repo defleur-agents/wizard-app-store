@@ -43,6 +43,13 @@ jobs:
         run: |
           set -eux
           docker image inspect hermes-slim:test --format 'size {{.Size}}'
+          # Plain-number sizes, measured the same way for both: gzip of `docker save` (≈ registry download) and files on disk.
+          docker pull -q nousresearch/hermes-agent:v2026.9.24 >/dev/null
+          for img in nousresearch/hermes-agent:v2026.9.24 hermes-slim:test; do
+            gz=$(docker save "$img" | gzip -6 | wc -c)
+            disk=$(docker run --rm --entrypoint sh "$img" -c 'du -sxb / 2>/dev/null | cut -f1')
+            echo "SIZE $img download_gzip_bytes=$gz unpacked_bytes=$disk"
+          done
           docker run --rm --entrypoint sh hermes-slim:test -c '
             claude --version | grep -q "^2.1.296 " &&
             test -f /opt/hermes/plugins/model-providers/claude-subscription-directsdk-experimental/plugin.yaml &&
