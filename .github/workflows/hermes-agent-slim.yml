@@ -46,7 +46,9 @@ jobs:
             ls /opt/hermes/.playwright/ && ldd $(ls -d /opt/hermes/.playwright/chromium_headless_shell-*/chrome-*/chrome-headless-shell | head -1) | grep -c "not found" | grep -q "^0$" &&
             test -f /opt/hermes/hermes_cli/web_dist/index.html && test -f /opt/hermes/ui-tui/dist/entry.js &&
             ! command -v gcc && ! command -v docker &&
-            cd /opt/hermes && node -e "require(\"playwright\").chromium.launch().then(async b=>{const p=await b.newPage();await p.setContent(\"<title>ok</title>\");console.log(\"CHROMIUM\",await p.title());await b.close()})" &&
+            hs=$(ls -d /opt/hermes/.playwright/chromium_headless_shell-*/chrome-*/chrome-headless-shell | head -1) &&
+            timeout 60 "$hs" --no-sandbox --disable-gpu --dump-dom "data:text/html,<title>ok</title><p>CHROMIUM_OK</p>" | grep -q CHROMIUM_OK && echo CHROMIUM_OK &&
+            cd /opt/hermes &&
             timeout 20 node --expose-gc ui-tui/dist/entry.js --help >/dev/null 2>&1; echo "tui exit $?" && echo SMOKE_OK'
           # Boot both images the same way (API server needs a real-length key) and require the same answers.
           KEY=$(openssl rand -hex 24)
